@@ -29,6 +29,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <byteswap.h>  // bswap32, bswap16 用
 
 #ifdef __cplusplus
     #include <atomic>
@@ -36,82 +37,24 @@
     #include <stdatomic.h>
 #endif
 
-#include "tbprobe.h"
-
-#ifdef __cplusplus
-using namespace std;
-#endif
-
-#define TB_PIECES    (7)
-#define TB_HASHBITS  (TB_PIECES < 7 ?  11 : 12)
-#define TB_MAX_PIECE (TB_PIECES < 7 ? 254 : 650)
-#define TB_MAX_PAWN  (TB_PIECES < 7 ? 256 : 861)
-#define TB_MAX_SYMS  (4096)
-
-#define TB_BEST_NONE            (0xFFFF)
-#define TB_SCORE_ILLEGAL        (0x7FFF)
-#define TB_MOVE_STALEMATE       (0xFFFF)
-#define TB_MOVE_CHECKMATE       (0xFFFE)
-
 #ifndef _WIN32
 #include <fcntl.h>
 #include <pthread.h>
 #include <unistd.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#define SEP_CHAR ':'
-#define FD int
-#define FD_ERR -1
-typedef size_t map_t;
 #else
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
 #include <windows.h>
-#define SEP_CHAR ';'
-#define FD HANDLE
-#define FD_ERR INVALID_HANDLE_VALUE
-typedef HANDLE map_t;
 #endif
 
-#define DECOMP64
-
-#if defined(__cplusplus) && (__cplusplus >= 201103L)
-    #include <mutex>
-    #define LOCK_T std::mutex
-    #define LOCK_INIT(x)
-    #define LOCK_DESTROY(x)
-    #define LOCK(x) x.lock()
-    #define UNLOCK(x) x.unlock()
-#else
-    #ifndef _WIN32
-        #define LOCK_T pthread_mutex_t
-        #define LOCK_INIT(x) pthread_mutex_init(&(x), NULL)
-        #define LOCK_DESTROY(x) pthread_mutex_destroy(&(x))
-        #define LOCK(x) pthread_mutex_lock(&(x))
-        #define UNLOCK(x) pthread_mutex_unlock(&(x))
-    #else
-        #define LOCK_T HANDLE
-        #define LOCK_INIT(x) do { x = CreateMutex(NULL, FALSE, NULL); } while (0)
-        #define LOCK_DESTROY(x) CloseHandle(x)
-        #define LOCK(x) WaitForSingleObject(x, INFINITE)
-        #define UNLOCK(x) ReleaseMutex(x)
-    #endif
-#endif
-
-#define TB_MAX(a,b)     ((a) > (b) ? (a) : (b))
-#define TB_MIN(a,b)     ((a) < (b) ? (a) : (b))
-
-#include "stdendian.h"
-
-#if _BYTE_ORDER == _BIG_ENDIAN
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
 static uint32_t from_le_u32(uint32_t x) { return bswap32(x); }
 static uint16_t from_le_u16(uint16_t x) { return bswap16(x); }
-static uint64_t from_be_u64(uint64_t x) { return x;          }
-static uint32_t from_be_u32(uint32_t x) { return x;          }
+static uint64_t from_be_u64(uint64_t x) { return x; }
+static uint32_t from_be_u32(uint32_t x) { return x; }
 #else
-static uint32_t from_le_u32(uint32_t x) { return x;          }
-static uint16_t from_le_u16(uint16_t x) { return x;          }
+static uint32_t from_le_u32(uint32_t x) { return x; }
+static uint16_t from_le_u16(uint16_t x) { return x; }
 static uint64_t from_be_u64(uint64_t x) { return bswap64(x); }
 static uint32_t from_be_u32(uint32_t x) { return bswap32(x); }
 #endif
